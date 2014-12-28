@@ -19,7 +19,7 @@
 #  MA 02110-1301, USA.
 #  
 #  
-import optparse,time,os,json
+import optparse,time,os,json,shutil
 
 global WORKSPACE_PATH,TIME_FORMAT
 TIME_FORMAT="%Y-%m-%d@%Z"
@@ -38,15 +38,25 @@ def new(date,git):
 	os.symlink(date,"today")
 	if git:
 		os.system("cd %s && git init"%date)
-
+        return os.path.join(WORKSPACE_PATH,date)
+def remove(date,git):
+        if os.path.isdir(date):
+                try:
+                        os.rmdir(date)
+                except OSError,e:
+                        if raw_input("Directory %s is not empty.Still remove it?[y/N]:").lower()=='y':
+                                shutil.rmtree(date)
+        else:
+                print "%s is not a directory."%date
 FUNCS_DICT={
 	"new":new,
+        "remove":remove,
 }
 def main():
 	global WORKSPACE_PATH
 	parse=optparse.OptionParser()
 	parse.add_option("--date","-d",default="today")
-	parse.add_option("--git","-g",default="true")
+	parse.add_option("--git","-g",default="false")
 	parse.add_option("--path","-p",default=WORKSPACE_PATH)
 	options, arguments = parse.parse_args()
 	if options.path!=WORKSPACE_PATH:
@@ -58,11 +68,14 @@ def main():
 	)
 	if arguments:
 		for f in arguments:
-			try:
-				FUNCS_DICT[f](*func_args)
-			except WorkspaceException as e:
-				print("Workspace Error:",e.message)
+                        if f in FUNCS_DICT:
+                                try:
+                                        FUNCS_DICT[f](*func_args)
+                                except WorkspaceException as e:
+                                        print("Workspace Error:",e.message)
+                        else:
+                                print "Unknown command '%s'."%f
 	else:
-		new(*func_args)
+                print new(*func_args)
 if __name__=="__main__":
 	main()
