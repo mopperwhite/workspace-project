@@ -18,7 +18,10 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 #  
-#  
+#
+
+
+# TODO linkto 
 import optparse,time,os,json,shutil
 
 global WORKSPACE_PATH,TIME_FORMAT
@@ -30,16 +33,19 @@ DATE_DICT={
 class WorkspaceException(Exception):
 	pass
 
-def new(date,git):
+def new(args,kwargs):
+	date=kwargs["date"]
+	git=kwargs["git"]
 	if not os.path.isdir(date):
 		os.mkdir(date)
-	if os.path.exists("today"):
-		os.remove("today")
-	os.symlink(date,"today")
+	#if os.path.exists("today"):
+	#	os.remove("today")
+	#os.symlink(date,"today")	#Creating a "today" link is not necessary nor safe.
 	if git:
 		os.system("cd %s && git init"%date)
         return os.path.join(WORKSPACE_PATH,date)
-def remove(date,git):
+def remove(args,kwargs):
+	date=kwargs["date"]
         if os.path.isdir(date):
                 try:
                         os.rmdir(date)
@@ -48,34 +54,68 @@ def remove(date,git):
                                 shutil.rmtree(date)
         else:
                 print "%s is not a directory."%date
+def work(args,kwargs):
+	wpl=os.listdir(WORKSPACE_PATH)
+	wpl.sort(key=lambda d:-os.path.getctime(os.path.join(WORKSPACE_PATH,d)))
+	work=args[0]
+        wpath=os.path.join(WORKSPACE_PATH,kwargs["date"],work)
+        if not os.path.exists(wpath):
+                for d in wpl:
+                        if d!=kwargs["date"]:
+                                if work in os.listdir(os.path.join(WORKSPACE_PATH,d)):
+                                        path=os.path.join(WORKSPACE_PATH,d,work)
+                                        while(os.path.islink(path)):
+                                                path=os.readlink(path)
+                                        os.symlink(path,wpath)
+                                        print(wpath)
+                                        return
+        elif os.path.isdir(wpath) or os.path.islink(wpath):
+                print wpath
+                return
+        else:
+                raise WorkspaceException("%s is not a file or a link."%wpath)
+        newwork(args,kwargs)
+def newwork(args,kwargs):
+        work=args[0]
+        wpath=os.path.join(WORKSPACE_PATH,kwargs["date"],work)
+        if not os.path.exists(wpath):
+                os.mkdir(wpath)
+                print wpath
+        elif os.path.isdir(wpath) or os.path.islink(wpath):
+                print wpath
+        else:
+                raise WorkspaceException("%s is not a file or a link."%wpath)
 FUNCS_DICT={
 	"new":new,
         "remove":remove,
+	"work":work,
+	"newwork":newwork,
 }
 def main():
 	global WORKSPACE_PATH
 	parse=optparse.OptionParser()
 	parse.add_option("--date","-d",default="today")
-	parse.add_option("--git","-g",default="false")
+	parse.add_option("--git","-g",default=False)
 	parse.add_option("--path","-p",default=WORKSPACE_PATH)
 	options, arguments = parse.parse_args()
 	if options.path!=WORKSPACE_PATH:
 		WORKSPACE_PATH=options.path
 	os.chdir(WORKSPACE_PATH)
-	func_args=(
-		DATE_DICT[options.date] if options.date in DATE_DICT else  time.strptime(options.date, TIME_FORMAT) ,
-		json.loads(options.git),
-	)
+	kwargs={
+		"date":DATE_DICT[options.date] if options.date in DATE_DICT else  time.strptime(options.date, TIME_FORMAT) ,
+		"git":options.git,
+		
+	}
 	if arguments:
-		for f in arguments:
-                        if f in FUNCS_DICT:
-                                try:
-                                        FUNCS_DICT[f](*func_args)
-                                except WorkspaceException as e:
-                                        print("Workspace Error:",e.message)
-                        else:
-                                print "Unknown command '%s'."%f
+        	if arguments[0] in FUNCS_DICT:
+               		try:
+                           	FUNCS_DICT[arguments[0]](arguments[1:],kwargs)
+                    	except WorkspaceException as e:
+                      		print("Workspace Error:",e.message)
+                                sys.exit(1)
+          	else:
+                   	print "Unknown command '%s'."%arguments[0]
 	else:
-                print new(*func_args)
+                print new(arguments[1:],kwargs)
 if __name__=="__main__":
 	main()
