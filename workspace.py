@@ -21,11 +21,12 @@
 #
 
 
-# TODO linkto 
-import optparse,time,os,json,shutil
+# TODO The same day on different zones
+import optparse,time,os,json,shutil,re,atexit
 
 global WORKSPACE_PATH,TIME_FORMAT
 TIME_FORMAT="%Y-%m-%d@%Z"
+TODAY=False
 WORKSPACE_PATH=os.path.join(os.path.expandvars('$HOME'),"Workspace")
 DATE_DICT={
 	"today":time.strftime(TIME_FORMAT),	
@@ -38,10 +39,14 @@ def new(args,kwargs):
 	git=kwargs["git"]
 	if not os.path.isdir(date):
 		os.mkdir(date)
-	#if os.path.exists("today"):
-	#	os.remove("today")
-	#os.symlink(date,"today")	#Creating a "today" link is not necessary nor safe.
-	if git:
+        if TODAY:
+        	if os.path.exists("Today"):
+        		os.remove("Today")
+        	os.symlink(date,"Today")
+        #Creating a "today" link is not necessary nor safe.
+	#But convert.
+        #But links cannot be put into the label of nautils, so "today" is still removed.
+        if git:
 		os.system("cd %s && git init"%date)
         return os.path.join(WORKSPACE_PATH,date)
 def remove(args,kwargs):
@@ -50,18 +55,20 @@ def remove(args,kwargs):
                 try:
                         os.rmdir(date)
                 except OSError,e:
-                        if raw_input("Directory %s is not empty.Still remove it?[y/N]:").lower()=='y':
+                        if raw_input("Directory %s is not empty.\
+Still remove it?[y/N]:"%date).lower()=='y':
                                 shutil.rmtree(date)
         else:
                 print "%s is not a directory."%date
 def work(args,kwargs):
+        new(args,kwargs)
 	wpl=os.listdir(WORKSPACE_PATH)
 	wpl.sort(key=lambda d:-os.path.getctime(os.path.join(WORKSPACE_PATH,d)))
-	work=args[0]
+        work=args[0]
         wpath=os.path.join(WORKSPACE_PATH,kwargs["date"],work)
         if not os.path.exists(wpath):
                 for d in wpl:
-                        if d!=kwargs["date"]:
+                        if d!=kwargs["date"] and re.search(r"^\d{4,4}-\d{2,2}-\d{2,2}@[A-Z]{3,3}$",d) is not None :
                                 if work in os.listdir(os.path.join(WORKSPACE_PATH,d)):
                                         path=os.path.join(WORKSPACE_PATH,d,work)
                                         while(os.path.islink(path)):

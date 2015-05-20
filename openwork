@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+nautilus `workspace work $1`
+gnome-terminal --working-directory=`workspace work $1` 
